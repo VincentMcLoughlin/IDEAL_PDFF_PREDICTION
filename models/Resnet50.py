@@ -1,0 +1,69 @@
+import tensorflow as tf
+from tensorflow.keras import layers
+from tensorflow.keras.layers import Conv2D, ZeroPadding2D     
+from tensorflow.keras import activations
+
+from models.model_components.ResnetBlocks import ConvBlock, IdentityBlock
+
+class Resnet50(tf.keras.Model):
+
+  def __init__(self, f1,num_classes=10):
+    super(Resnet50, self).__init__()
+
+    #self.input_layer = Input(shape=input_shape)
+    self.zero_padding = ZeroPadding2D(padding=(3,3))
+    self.initial_conv = Conv2D(f1, kernel_size=(7,7), strides=(2,2))
+    scaling = 2
+    self.convblock_1 = ConvBlock(f1, f1*scaling, s=1, block_name='conv1')
+    self.identity_block_1a = IdentityBlock(f1, f1*scaling, block_name='id1a')
+    self.identity_block_1b = IdentityBlock(f1, f1*scaling, block_name='id1b')
+    self.identity_block_1c = IdentityBlock(f1, f1*scaling, block_name='id1c')
+
+    f2 = f1*2
+    self.convblock_2 = ConvBlock(f2, f2*scaling, s=2, block_name='conv2')
+    self.identity_block_2a = IdentityBlock(f2, f2*scaling, block_name='id2a')
+    self.identity_block_2b = IdentityBlock(f2, f2*scaling, block_name='id2b')
+    self.identity_block_2c = IdentityBlock(f2, f2*scaling, block_name='id2c')
+
+    f3 = f2*2
+    self.convblock_3 = ConvBlock(f3, f3*scaling, s=2, block_name='conv3')
+    self.identity_block_3a = IdentityBlock(f3, f3*scaling, block_name='id3a')
+    self.identity_block_3b = IdentityBlock(f3, f3*scaling, block_name='id3b')
+    self.identity_block_3c = IdentityBlock(f3, f3*scaling, block_name='id3c')
+
+    f4 = f3*2
+    self.convblock_4 = ConvBlock(f4, f4*scaling, s=2, block_name='conv4')
+    self.identity_block_4a = IdentityBlock(f4, f4*scaling, block_name='id4a')
+    self.identity_block_4b = IdentityBlock(f4, f4*scaling, block_name='id4b')
+    self.identity_block_4c = IdentityBlock(f4, f4*scaling, block_name='id4c')
+
+    self.avg_pooling = layers.GlobalAveragePooling2D()
+    self.flatten = layers.Flatten()
+    self.output_layer = layers.Dense(num_classes, name='output_layer', activation="softmax")
+
+  def call(self, inputs):
+    x = self.zero_padding(inputs)
+    x = self.initial_conv(x)
+
+    x = self.convblock_1(x)
+    x = self.identity_block_1a(x)
+    x = self.identity_block_1b(x)
+
+    x = self.convblock_2(x)
+    x = self.identity_block_2a(x)
+    x = self.identity_block_2b(x)
+
+    x = self.convblock_3(x)
+    x = self.identity_block_3a(x)
+    x = self.identity_block_3b(x)
+
+    x = self.convblock_4(x)
+    x = self.identity_block_4a(x)
+    x = self.identity_block_4b(x)
+    x = self.avg_pooling(x)
+    x = self.flatten(x)
+    #x = self.dense1(x)
+    #x = self.dense2(x)
+    x = self.output_layer(x)
+
+    return x
