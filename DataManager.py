@@ -6,7 +6,9 @@ import numpy as np
 MAX_PIXEL_VALUE = 4095
 
 def read_numpy_file(data_path, label):
-    img_tensor = np.load(data_path)/MAX_PIXEL_VALUE
+    img_tensor = np.load(data_path)
+    #img_tensor = np.load(data_path)/MAX_PIXEL_VALUE
+    img_tensor = (img_tensor - img_tensor.mean(axis=(0,1,2), keepdims=True)) / img_tensor.std(axis=(0,1,2), keepdims=True)
     return img_tensor, label
 
 class DataManager:
@@ -51,6 +53,9 @@ class DataManager:
         #self.train_df, self.test_df, self.val_df = self._make_train_test_split()        
         self.train_df, self.test_df = self._make_train_test_split()        
         
+        self.num_train = self.train_df.shape[0]
+        self.num_test = self.test_df.shape[0]
+
         train_dataset = self._build_dataset(self.train_df, self.batch_size)
         test_dataset = self._build_dataset(self.test_df, self.batch_size)
         #val_dataset = self._build_dataset(self.val_df, batch_size)
@@ -59,3 +64,9 @@ class DataManager:
 
     def get_config(self):
         return self.config_dict
+    
+    def get_num_train(self):
+        return self.num_train
+    
+    def get_num_test(self):
+        return self.num_test
