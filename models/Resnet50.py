@@ -7,8 +7,8 @@ from models.model_components.ResnetBlocks import ConvBlock, IdentityBlock
 
 class Resnet50(tf.keras.Model):
 
-  def __init__(self, f1,num_classes=10):
-    super(Resnet50, self).__init__()
+  def __init__(self, f1,num_classes=10, **kwargs):
+    super(Resnet50, self).__init__(**kwargs)
 
     #self.input_layer = Input(shape=input_shape)
     self.zero_padding = ZeroPadding2D(padding=(3,3))
@@ -39,7 +39,11 @@ class Resnet50(tf.keras.Model):
 
     self.avg_pooling = layers.GlobalAveragePooling2D()
     self.flatten = layers.Flatten()
-    self.output_layer = layers.Dense(num_classes, name='output_layer', activation="softmax")
+
+    if num_classes > 1:
+      self.output_layer = layers.Dense(num_classes, name='output_layer', activation="softmax")
+    else:
+      self.output_layer = layers.Dense(num_classes, name='output_layer')
 
   def call(self, inputs):
     x = self.zero_padding(inputs)
