@@ -11,6 +11,12 @@ def read_numpy_file(data_path, label):
     img_tensor = (img_tensor - img_tensor.mean(axis=(0,1,2), keepdims=True)) / img_tensor.std(axis=(0,1,2), keepdims=True)
     return img_tensor, label
 
+BS = 0
+def _fixup_shape(image, label):
+    INPUT_IMAGE_SHAPE = (232, 256, 36)
+    image.set_shape(INPUT_IMAGE_SHAPE)
+    label.set_shape([])
+    return image, label
 class DataManager:
 
     def __init__(self, config_path):
@@ -20,7 +26,7 @@ class DataManager:
         self.score_column_name = self.config_dict["score_column_name"]
         self.train_test_frac = self.config_dict["train_test_split_fraction"]
         self.validation_frac = self.config_dict["validate_fraction"]
-        self.batch_size = self.config_dict["batch_size"]
+        self.batch_size = self.config_dict["batch_size"]        
 
     def _read_yaml(self, path):
         with open(path, 'r') as f:
@@ -43,10 +49,9 @@ class DataManager:
 
     def _build_dataset(self, data_info_df, batch_size):
         dataset = tf.data.Dataset.from_tensor_slices((data_info_df[self.data_column_name].tolist(),data_info_df[self.score_column_name].tolist()))
-        dataset = dataset.map(lambda x, y: tf.numpy_function(read_numpy_file, [x,y], [tf.dtypes.float32, tf.dtypes.float32])).prefetch(tf.data.AUTOTUNE).batch(batch_size)
-        it = dataset.__iter__() #See https://stackoverflow.com/questions/58933151/as-list-is-not-defined-on-an-unknown-tensorshape
-        return it
-        #return dataset
+        dataset = dataset.map(lambda x, y: tf.numpy_function(read_numpy_file, [x,y], [tf.dtypes.float32, tf.dtypes.float32])).prefetch(tf.data.AUTOTUNE)
+        dataset = dataset.map(_fixup_shape).prefetch(tf.data.AUTOTUNE).batch(batch_size)        
+        return dataset
     
     def build_datasets(self):
                 
