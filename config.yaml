@@ -1,0 +1,9 @@
+#reference_csv_path: "reference_data/IDEAL_X20254_clean_extracted_w_numpy.csv"
+#reference_csv_path: "reference_data/IDEAL_X20254_clean_extracted_w_numpy_mini.csv"
+reference_csv_path: "reference_data/IDEAL_X20254_clean_extracted_w_numpy_micro.csv"
+data_column_name: "numpy_dark_paths"
+score_column_name: "norm_PDFF"
+train_test_split_fraction: 0.75
+validate_fraction: 0
+batch_size: 64
+epochs: 20

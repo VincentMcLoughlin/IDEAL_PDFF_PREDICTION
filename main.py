@@ -1,11 +1,34 @@
 from DataManager import DataManager
 from models.Resnet50 import Resnet50
 from models.SmallResnet import SmallResnet
+from utils.RSquared import RSquared
 import tensorflow as tf
 import numpy as np
 from pathlib import Path
+#from tensorflow.keras.metrics import R2Score #Unfortunately not in our version of tf
 
 #input shape is (232, 256, 36)
+
+class diff(tf.keras.metrics.Metric):
+    def __init__(self, name = 'diff', **kwargs):
+        super(diff, self).__init__(**kwargs)
+        self.tp = self.add_weight('tp', initializer = 'zeros')
+        self.fp = self.add_weight('fp', initializer = 'zeros')
+
+    def update_state(self, y_true, y_pred,sample_weight=None):
+        y_true = tf.cast(y_true, tf.bool)
+        y_pred = tf.math.greater(y_pred, 0.5)      
+        true_p = tf.logical_and(tf.equal(y_true, True), tf.equal(y_pred, True))
+        false_p = tf.logical_and(tf.equal(y_true, False), tf.equal(y_pred, True))
+        self.tp.assign_add(tf.reduce_sum(tf.cast(true_p, self.dtype)))
+        self.fp.assign_add(tf.reduce_sum(tf.cast(false_p, self.dtype)))
+    
+    def reset_state(self):
+        self.tp.assign(0)
+        self.fp.assign(0)
+
+    def result(self):
+        return self.tp - self.fp
 
 def setup_logger(model_name, dataset_name, batch_size, n, other_names):
 
@@ -45,7 +68,7 @@ def main():
 
     resnet_model.compile(optimizer=optimizer,              
               loss = 'mean_absolute_error',
-              metrics=['mean_absolute_error','mean_absolute_percentage_error'])
+              metrics=['mean_absolute_error','mean_absolute_percentage_error', RSquared(name='r2_score')])
     
     resnet_model.build(input_shape = (batch_size, 232, 256, 36))
     
