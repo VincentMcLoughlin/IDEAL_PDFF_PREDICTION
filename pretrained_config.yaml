@@ -1,0 +1,15 @@
+reference_csv_path: "training_data/IDEAL_X20254_clean_extracted_w_numpy_micro.csv"
+#reference_csv_path: "training_data/IDEAL_X20254_clean_train.csv" #90% of original data, rest in holdout val set
+data_column_name: "numpy_dark_paths"
+score_column_name: "PDFF"
+train_test_split_fraction: 0.9
+validate_fraction: 0
+batch_size: 32
+epochs: 10
+augmentation:
+  flip: "horizontal"
+  rotate: 0.1
+  zoom_height: 0.2
+  zoom_width: 0.2   
+  translate_Width: 0.2
+  translate_height: 0.2
