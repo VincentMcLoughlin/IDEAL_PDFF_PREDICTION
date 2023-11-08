@@ -5,12 +5,57 @@ from utils.RSquared import RSquared
 import tensorflow as tf
 import numpy as np
 from pathlib import Path
+from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import LearningRateScheduler
 #from tensorflow.keras.metrics import R2Score Unfortunately not in our version of tf
 
 #input shape is (232, 256, 36), which we crop to 224x224x36
 MAX_PIXEL_VALUE = 375 # Max pixel value across entire dark dataset
 IMG_SHAPE = (224, 224, 36)
+
+def get_multichannel_weights(weights, num_channels):
+  avg_weight = np.mean(weights, axis=-2)  
+  avg_weights = avg_weight.reshape(weights[:,:,-1:,:].shape)
+
+  multi_channel_weights = np.tile(avg_weights, (num_channels, 1))
+  return multi_channel_weights
+
+def adjust_pretrained_input(base_model, first_conv_idx, num_channels, new_input_shape):
+    base_config = base_model.get_config()
+    base_config["layers"][0]["config"]["batch_input_shape"] = new_input_shape
+    new_model = Model.from_config(base_config)
+
+    new_model_layer_names = []
+    new_model_config = new_model.get_config()
+
+    for i in range(len(new_model_config['layers'])):
+        new_model_layer_names.append(new_model_config['layers'][i]['name'])
+
+    first_conv_name = new_model_layer_names[first_conv_idx]
+    print(first_conv_name)
+
+    for layer in base_model.layers:
+
+        if layer.name in new_model_layer_names:
+
+            if layer.get_weights() != []:
+                target_layer = new_model.get_layer(layer.name)
+
+                if layer.name in first_conv_name:
+                    weights = layer.get_weights()[0]
+                    biases = layer.get_weights()[1]
+
+                    weights_extra_channels = get_multichannel_weights(weights, num_channels)
+                    print(weights_extra_channels.shape)
+                    target_layer.set_weights([weights_extra_channels, biases])
+                    target_layer.trainable = False
+
+                else:
+                    target_layer.set_weights(layer.get_weights())
+                    target_layer.trainable = False
+
+    return new_model
+
 def setup_logger(model_name, dataset_name, batch_size, n, other_names):
 
     folder_name = f"logging/{model_name}/" 
