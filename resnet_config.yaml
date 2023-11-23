@@ -6,8 +6,10 @@ data_column_name: "numpy_dark_paths"
 score_column_name: "PDFF"
 train_test_split_fraction: 0.9
 validate_fraction: 0
-batch_size: 64
+batch_size: 32
 epochs: 80
+max_pixel_value: 375
+Z_standardize: True
 augmentation:
   flip: "horizontal"
   rotate: 0.1

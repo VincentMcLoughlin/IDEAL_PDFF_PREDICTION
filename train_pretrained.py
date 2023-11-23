@@ -6,12 +6,12 @@ import tensorflow as tf
 import numpy as np
 from pathlib import Path
 from tensorflow.keras.models import Model
-from tensorflow.keras.callbacks import LearningRateScheduler
+from tensorflow.keras.callbacks import LearningRateScheduler, ModelCheckpoint
 #from tensorflow.keras.metrics import R2Score Unfortunately not in our version of tf
 
 #input shape is (232, 256, 36), which we crop to 224x224x36
 MAX_PIXEL_VALUE = 375 # Max pixel value across entire dark dataset
-IMG_SHAPE = (224, 224, 36)
+IMG_SHAPE = (None, 232, 256, 36)
 
 def get_multichannel_weights(weights, num_channels):
   avg_weight = np.mean(weights, axis=-2)  
@@ -31,8 +31,7 @@ def adjust_pretrained_input(base_model, first_conv_idx, num_channels, new_input_
     for i in range(len(new_model_config['layers'])):
         new_model_layer_names.append(new_model_config['layers'][i]['name'])
 
-    first_conv_name = new_model_layer_names[first_conv_idx]
-    print(first_conv_name)
+    first_conv_name = new_model_layer_names[first_conv_idx]    
 
     for layer in base_model.layers:
 
@@ -83,17 +82,29 @@ def main():
     config = data_manager.get_config()
     batch_size = config["batch_size"]
     epochs = config["epochs"]
+
+    base_model = tf.keras.applications.resnet50.ResNet50(include_top=False,
+                                                        weights='imagenet')
     
-    base_model = tf.keras.applications.MobileNetV2(input_shape=IMG_SHAPE,
-                                               include_top=False,
-                                               weights='imagenet')
+    base_model.trainable = False
     
-    pretrained_model = PretrainedModel(base_model, max_value = MAX_PIXEL_VALUE, crop_height=224, crop_width=224, augment_config=config["augmentation"])
-    
-    model_name = "mobilenet_pretrained"
+    updated_model = adjust_pretrained_input(base_model=base_model, first_conv_idx=2, num_channels=36, new_input_shape=IMG_SHAPE)
+
+    pretrained_model = PretrainedModel(updated_model, max_value = MAX_PIXEL_VALUE, crop_height=224, crop_width=224, augment_config=config["augmentation"])
+
+    model_name = "resnet50_pretrained"
     dataset_name = "full_ideal"
-    other_names = "transfer_learn"
-    csv_logger = setup_logger(model_name, dataset_name, batch_size, "pretrained", other_names)
+    other_names = "transfer_learn_base"
+
+    checkpoint_file_path = f"/home/mclougv/IDEAL_PDFF_prediction/model_checkpoints/{model_name}_{dataset_name}_bs={batch_size}_{other_names}"
+    model_checkpoint = ModelCheckpoint(filepath=checkpoint_file_path,
+        save_weights_only=False,
+        monitor='loss',
+        mode='auto',
+        save_freq='epoch',
+        save_best_only=True)
+    
+    csv_logger = setup_logger(model_name, dataset_name, batch_size, "base", other_names)
     base_learning_rate = 0.0001
     optimizer = tf.keras.optimizers.Adam(learning_rate=base_learning_rate)
     lrate_res = LearningRateScheduler(res_scheduler)
@@ -105,8 +116,6 @@ def main():
     steps_per_epoch = int(np.ceil(num_train / batch_size))
     val_steps_per_epoch = int(np.ceil(num_test / batch_size))
     
-    #train_dataset, test_dataset = apply_augmentation(train_dataset, test_dataset)
-    
     pretrained_model.compile(optimizer=optimizer,              
               loss = 'mean_absolute_error',
               metrics=['mean_absolute_error','mean_absolute_percentage_error', RSquared(name='r2_score')])
@@ -114,25 +123,41 @@ def main():
     pretrained_model.build(input_shape = (batch_size, 232, 256, 36))
     
     history = pretrained_model.fit(train_dataset.repeat(), validation_data = test_dataset.repeat(), batch_size=batch_size, epochs=epochs, 
-                               steps_per_epoch=steps_per_epoch, validation_steps=val_steps_per_epoch, callbacks=(lrate_res, csv_logger, early_stop))        
+                               steps_per_epoch=steps_per_epoch, validation_steps=val_steps_per_epoch, callbacks=(lrate_res, csv_logger, early_stop, model_checkpoint))        
     
     #### Fine tuning
     pretrained_model.base_model.trainable = True
     other_names = "fine_tune"
-    csv_logger = setup_logger(model_name, dataset_name, batch_size, "pretrained", other_names)
-    early_stop = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=3, restore_best_weights=True)
 
+    checkpoint_file_path = f"/home/mclougv/IDEAL_PDFF_prediction//model_checkpoints/{model_name}_{dataset_name}_bs={batch_size}_{other_names}"
+    model_checkpoint = ModelCheckpoint(filepath=checkpoint_file_path,
+        save_weights_only=False,
+        monitor='loss',
+        mode='auto',
+        save_freq='epoch',
+        save_best_only=True)
+    
+    csv_logger = setup_logger(model_name, dataset_name, batch_size, "finetune", other_names)
+    early_stop = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=3, restore_best_weights=True)
+    checkpoint_file_path = f"/home/mclougv/IDEAL_PDFF_prediction/model_checkpoints/{model_name}_{dataset_name}_bs={batch_size}_{ }"
+    model_checkpoint = ModelCheckpoint(filepath=checkpoint_file_path,
+        save_weights_only=False,
+        monitor='loss',
+        mode='auto',
+        save_freq='epoch',
+        save_best_only=True)
+    
     #Switch layers to trainable
-    num_tuneable_layers = 100
+    num_tuneable_layers = 125
 
     for layer in pretrained_model.base_model.layers[:num_tuneable_layers]:
         layer.trainable = False    
 
-    pretrained_model.compile(loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
+    pretrained_model.compile(loss = 'mean_absolute_error',
               optimizer = tf.keras.optimizers.RMSprop(learning_rate=base_learning_rate/10),
-              metrics=[tf.keras.metrics.BinaryAccuracy(threshold=0, name='accuracy')])
+              metrics=['mean_absolute_error','mean_absolute_percentage_error', RSquared(name='r2_score')])
     
-    tuning_epochs = 10
+    tuning_epochs = 50 # Should early stop
 
     total_epochs = epochs + tuning_epochs
 
@@ -140,7 +165,9 @@ def main():
                          epochs=total_epochs,
                          initial_epoch=history.epoch[-1],
                          validation_data=test_dataset.repeat(),
-                         callbacks = [early_stop])    
+                         steps_per_epoch=steps_per_epoch, 
+                         validation_steps=val_steps_per_epoch,
+                         callbacks = [early_stop, csv_logger, early_stop, model_checkpoint])    
 
 if __name__ == "__main__":
     main()    

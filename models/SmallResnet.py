@@ -61,7 +61,8 @@ class SmallResnet(tf.keras.Model):
     x = self.identity_block_2b(x)
 
     x = self.avg_pooling(x)
-    x = self.flatten(x)
+    x = tf.keras.layers.Dropout(0.2)(x)
+    #x = self.flatten(x)
     #x = self.dense1(x)
     #x = self.dense2(x)
     x = self.output_layer(x)

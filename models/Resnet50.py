@@ -47,7 +47,7 @@ class Resnet50(tf.keras.Model):
     self.identity_block_4c = IdentityBlock(f4, f4*scaling, block_name='id4c')
 
     self.avg_pooling = layers.GlobalAveragePooling2D()
-    self.flatten = layers.Flatten()
+    
 
     if num_classes > 1:
       self.output_layer = layers.Dense(num_classes, name='output_layer', activation="softmax")
@@ -83,7 +83,7 @@ class Resnet50(tf.keras.Model):
     x = self.identity_block_4a(x)
     x = self.identity_block_4b(x)
     x = self.avg_pooling(x)
-    x = self.flatten(x)
+    x = tf.keras.layers.Dropout(0.2)(x)
     
     x = self.output_layer(x)
 

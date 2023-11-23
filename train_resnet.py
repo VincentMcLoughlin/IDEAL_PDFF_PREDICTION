@@ -5,7 +5,7 @@ from utils.RSquared import RSquared
 import tensorflow as tf
 import numpy as np
 from pathlib import Path
-from tensorflow.keras.callbacks import LearningRateScheduler
+from tensorflow.keras.callbacks import LearningRateScheduler, ModelCheckpoint
 #from tensorflow.keras.metrics import R2Score #Unfortunately not in our version of tf
 
 #input shape is (232, 256, 36)
@@ -39,13 +39,25 @@ def main():
     
     starting_neurons = 64
     #resnet_model = Resnet50(starting_neurons, num_classes=1)
-    resnet_model = SmallResnet(starting_neurons, num_classes=1)
+    add_rescale = not config["Z_standardize"]
+    #resnet_model = SmallResnet(starting_neurons, max_pixel_value=config["max_pixel_value"], add_rescale= add_rescale, num_classes=1)
+    resnet_model = Resnet50(starting_neurons, max_pixel_value=config["max_pixel_value"], add_rescale= add_rescale, num_classes=1)
     
-    model_name = "small_resnet"
+    model_name = "resnet50"
     dataset_name = "full_ideal"
     other_names = "augmented"
     csv_logger = setup_logger(model_name, dataset_name, batch_size, starting_neurons, other_names)
 
+    checkpoint_file_path = f"/home/mclougv/IDEAL_PDFF_prediction/model_checkpoints/{model_name}_{dataset_name}_bs={batch_size}_{other_names}"
+    model_checkpoint = ModelCheckpoint(filepath=checkpoint_file_path,
+        save_weights_only=False,
+        monitor='loss',
+        mode='auto',
+        save_freq='epoch',
+        save_best_only=True)
+    
+    early_stop = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=3, restore_best_weights=True)
+    
     optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
     lrate_res = LearningRateScheduler(res_scheduler)
 
@@ -64,7 +76,7 @@ def main():
     resnet_model.build(input_shape = (batch_size, 232, 256, 36))
     
     history = resnet_model.fit(train_dataset.repeat(), validation_data = test_dataset.repeat(), batch_size=batch_size, epochs=epochs, 
-                               steps_per_epoch=steps_per_epoch, validation_steps=val_steps_per_epoch, callbacks=(lrate_res, csv_logger))
+                               steps_per_epoch=steps_per_epoch, validation_steps=val_steps_per_epoch, callbacks=(lrate_res, csv_logger, model_checkpoint, early_stop))
 
 if __name__ == "__main__":
     main()

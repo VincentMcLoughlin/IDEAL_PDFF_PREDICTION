@@ -36,3 +36,7 @@ sbatch -c 8 --mem=120G --gres=gpu:4 --wrap="python3 main.py"
 Location of max pixel value for dark 
 29600 327.0
 29500 375.0
+
+slurm-2007264.out - Pretrained resnet50 w imagenet 
+
+slurm-2007297 - untrained resnet20, some success with batch size of 8 but quite unstable
