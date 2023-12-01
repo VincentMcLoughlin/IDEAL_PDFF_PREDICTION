@@ -139,7 +139,7 @@ def main():
     
     csv_logger = setup_logger(model_name, dataset_name, batch_size, "finetune", other_names)
     early_stop = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=3, restore_best_weights=True)
-    checkpoint_file_path = f"/home/mclougv/IDEAL_PDFF_prediction/model_checkpoints/{model_name}_{dataset_name}_bs={batch_size}_{ }"
+    checkpoint_file_path = f"/home/mclougv/IDEAL_PDFF_prediction/model_checkpoints/{model_name}_{dataset_name}_bs={batch_size}_{}"
     model_checkpoint = ModelCheckpoint(filepath=checkpoint_file_path,
         save_weights_only=False,
         monitor='loss',
